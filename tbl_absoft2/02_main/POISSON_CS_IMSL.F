@@ -1,0 +1,268 @@
+C---------------------------------------------------------------------------
+C
+C     POISSON SOLVER WITH COS/FFT TRANSFORM FOR UNIFORM MESHS IN X1, X3 DIRECTIONS
+C
+C     POISSON EQUATION IS SOLVED BY
+C     1. FFT IN X3 DIRECTION
+C     2. COS TRANSFORM IN X1 DIRECTION
+C     3. TRIDIAGONAL SOLVER IN X2 DIRECTION
+C
+C     CONTRAINT : PLANE AVERAGE OF PRESSURE OVER XZ PLANE AT J=N2M IS ZERO.
+C                 X1,X3 UNIFORM MESH 
+C
+C     2003. 12. 17.
+C     KYOUNGYOUN KIM
+C     FLOW CONTROL LABORATORY
+C     DEPARTMENT OF MECHANICAL ENGINEERING
+C     KAIST 
+
+
+C*************** INIPOISSON ******************************
+      SUBROUTINE INIPOISSON
+      INCLUDE 'PARAM.H'
+      PARAMETER (M3M=M3-1,M3MH=M3M/2)
+      COMMON/DIM/N1,N2,N3,N1M,N2M,N3M
+      COMMON/MESH1/DX3,DX3Q
+      COMMON/WAVK13/AK1(0:M1),AK3(0:M3MH)
+      COMMON/SIZE/ALX,ALY,ALZ
+
+      PI=ACOS(-1.0)
+
+C     MODIFIED WAVE NUMBER DEFINITION NECESSARY FOR THE X1 DIRECTION
+      
+	DX1Q = (DBLE(N1M)/ALX)**2
+	DO 10 L=0,N1M-1
+  10  AK1(L)=2.*(1.-COS(L*PI/N1M))*DX1Q
+
+C     MODIFIED WAVE NUMBER DEFINITION NECESSARY FOR THE X3 DIRECTION
+      DO 20 M=0,N3M/2
+  20  AK3(M)=2.*(1.-COS(M*2.*PI/N3M))*DX3Q
+
+      CALL METRICPOISSON
+
+      RETURN
+      END
+
+
+C  ************************ METRICPOISSON  **********************
+      SUBROUTINE METRICPOISSON
+
+      INCLUDE 'PARAM.H'
+      COMMON/DIM/N1,N2,N3,N1M,N2M,N3M
+      COMMON/INDX2/JPA(M2),JMU(M2),JMV(M2)
+      COMMON/MESH1/DX3,DX3Q
+      COMMON/MESH3/DY(0:M2),H(M2)
+      COMMON/METPOI/PMJ(M2),PCJ(M2),PPJ(M2)
+
+      DO 100 JC=1,N2M
+      JP=JC+1
+      JM=JC-1
+      JUM=JC-JMU(JC)
+      JUP=JPA(JC)-JC
+      PMJ(JC)=JUM*(1.0/DY(JC)/H(JC))
+      PPJ(JC)=JUP*(1.0/DY(JC)/H(JP))
+	PCJ(JC)=-(PMJ(JC)+PPJ(JC))
+      
+  100 CONTINUE
+
+      RETURN
+      END
+
+C*************** TAKEDP ********************************
+      SUBROUTINE TAKEDP(DP,RDP)
+      INCLUDE 'PARAM.H'
+      PARAMETER (M1M=M1-1,M3M=M3-1,M3MH=M3M/2)
+      PARAMETER (M2M=M2-1)
+      COMMON/DIM/N1,N2,N3,N1M,N2M,N3M
+      COMMON/WAVK13/AK1(0:M1),AK3(0:M3MH)
+      COMMON/METPOI/PMJ(M2),PCJ(M2),PPJ(M2)
+
+      REAL RDP(0:M1,0:M2,0:M3),DP(0:M1,0:M2,0:M3)
+      REAL CRDP(0:M1,M2,M3)
+      REAL CDP(0:M1,M2,M3)
+      REAL FRDP_R(0:M1,M2,0:M3MH)
+      REAL FRDP_I(0:M1,M2,0:M3MH)
+      REAL FDP_R(0:M1,M2,0:M3MH)
+      REAL FDP_I(0:M1,M2,0:M3MH)
+      REAL CMJ(M2),CCJ(M2),CPJ(M2),R(M2)
+
+      REAL WQCOS(3*M1M+15)
+      REAL RCIN(M1M)
+      REAL RCEX(M1M)
+
+      REAL WFFTR(2*M3M+15)
+      REAL RFIN(M3M)
+      REAL RFEX(M3M)
+
+
+C     COSINE TRANSFORM OF RDP IN X1 DIRECTION
+
+      CALL DQCOSI(N1M,WQCOS)      
+
+      DO 100 J=1,N2M
+      DO 100 K=1,N3M
+      DO L=1,N1M  
+      RCIN(L)=RDP(L,J,K)
+      END DO
+      CALL DQ2OSB(N1M,RCIN,RCEX,WQCOS)
+      DO  L=0,N1M-1
+      CRDP(L,J,K)=RCEX(L+1)
+      END DO
+100   CONTINUE
+
+
+C---  IF N3M=1, WE DON'T HAVE TO FFT IN X3 DIRECTION
+      IF(N3M.EQ.1) THEN
+
+      DO 300 L=0,N1M-1
+      
+	DO 301 J=1,N2M
+         CMJ(J)=PMJ(J)
+         CCJ(J)=PCJ(J)-AK1(L)
+         CPJ(J)=PPJ(J)
+         R(J)=CRDP(L,J,1)
+301   CONTINUE
+
+C     SPECIAL TREATMENT TO REMOVE SINGULARITY WHEN L=K=0
+      IF (L.EQ.0) THEN
+      CPJ(N2M-1)=0.0
+      CALL TDMAP(CMJ,CCJ,CPJ,R,R,N2M-1)
+      ENDIF
+      IF (L.NE.0) CALL TDMAP(CMJ,CCJ,CPJ,R,R,N2M)
+      DO 303 J=1,N2M
+303   CDP(L,J,1)=R(J)
+      IF (L.EQ.0) CDP(L,N2M,1)=0.
+
+300   CONTINUE
+
+      GOTO 777
+      ENDIF
+C---
+
+C     FFT OF RDP IN X3 DIRECTION
+
+      CALL DFFTRI(N3M,WFFTR)
+
+      DO 110 L=0,N1M-1
+      DO 110 J=1,N2M
+
+      DO K=1,N3M  
+         RFIN(K)=CRDP(L,J,K)
+      END DO
+
+      CALL DF2TRF(N3M,RFIN,RFEX,WFFTR)
+
+         FRDP_R(L,J,0)=RFEX(1)
+      DO M=1,N3M/2-1
+         FRDP_R(L,J,M)=RFEX(2*M)
+         FRDP_I(L,J,M)=RFEX(2*M+1)
+      ENDDO
+         FRDP_R(L,J,N3M/2)=RFEX(N3M)
+
+110   CONTINUE
+
+
+C     SOLUTION OF POISSON EQ. ; REAL PART
+
+      DO 70 L=0,N1M-1
+      DO 70 M=0,N3M/2
+
+      DO 71 J=1,N2M
+      CMJ(J)=PMJ(J)
+      CCJ(J)=PCJ(J)-AK3(M)-AK1(L)
+      CPJ(J)=PPJ(J)
+      R(J)=FRDP_R(L,J,M)
+ 71   CONTINUE
+
+C     SPECIAL TREATMENT TO REMOVE SINGULARITY WHEN L=K=0
+
+      IF (L.EQ.0.AND.M.EQ.0) THEN
+      CPJ(N2M-1)=0.0
+      CALL TDMAP(CMJ,CCJ,CPJ,R,R,N2M-1)
+      ENDIF
+      IF (L.NE.0.OR.M.NE.0) CALL TDMAP(CMJ,CCJ,CPJ,R,R,N2M)
+      DO 73 J=1,N2M
+ 73   FDP_R(L,J,M)=R(J)
+      IF (L.EQ.0.AND.M.EQ.0) FDP_R(L,N2M,M)=0.
+
+ 70   CONTINUE
+
+C     SOLUTION OF POISSON EQ. ; IMAGE PART
+
+      DO 80 L=0,N1M-1
+      DO 80 M=1,N3M/2-1
+      DO 81 J=1,N2M
+      CMJ(J)=PMJ(J)
+      CCJ(J)=PCJ(J)-AK3(M)-AK1(L)
+      CPJ(J)=PPJ(J)
+81    R(J)=FRDP_I(L,J,M)
+
+      CALL TDMAP(CMJ,CCJ,CPJ,R,R,N2M)
+
+      DO 83 J=1,N2M
+ 83   FDP_I(L,J,M)=R(J)
+ 80   CONTINUE
+
+
+C     INVERSE FFT OF FDP IN X3 DIRECTION
+
+      DO 200 L=0,N1M-1
+      DO 200 J=1,N2M
+
+         RFIN(1)=FDP_R(L,J,0)
+      DO M=1,N3M/2-1
+         RFIN(2*M)=FDP_R(L,J,M)
+         RFIN(2*M+1)=FDP_I(L,J,M)
+      ENDDO
+         RFIN(N3M)=FDP_R(L,J,N3M/2)
+
+      CALL DF2TRB(N3M,RFIN,RFEX,WFFTR)
+
+      SCALE = 1.0/REAL(N3M)
+
+      DO 23 K=1,N3M
+23    CDP(L,J,K)=RFEX(K)*SCALE
+
+ 200  CONTINUE
+
+
+C      INVERSE COSINE TRANSFORM OF CDP IN X1 DIRECTION
+777   CONTINUE
+
+      DO 40 J=1,N2M
+      DO 40 K=1,N3M
+
+      DO 41 L=1,N1M
+41    RCIN(L)=CDP(L-1,J,K)
+
+      CALL DQ2OSF(N1M,RCIN,RCEX,WQCOS)
+
+      SCALE = 1./4.0/REAL(N1M)
+      DO 42 I=1,N1M
+42    DP(I,J,K)=RCEX(I)*SCALE
+
+40    CONTINUE
+
+      RETURN
+      END
+
+C*************** TDMAP **********************
+      SUBROUTINE TDMAP(A,B,C,R,X,NF)
+      INCLUDE 'PARAM.H'
+      REAL BET(M2),GAM(M2),A(M2),B(M2),C(M2),R(M2),X(M2)
+
+      BET(1)=B(1)
+      GAM(1)=C(1)/BET(1) 
+      X(1)=R(1)/BET(1)
+ 
+      DO 10 J=2,NF
+      BET(J)=B(J)-A(J)*GAM(J-1)
+      GAM(J)=C(J)/BET(J)
+      X(J)=(R(J)-A(J)*X(J-1))/BET(J)
+   10 CONTINUE
+
+      DO 20 J=NF,1,-1
+      X(J)=X(J)-GAM(J)*X(J+1)
+   20 CONTINUE
+      RETURN
+      END

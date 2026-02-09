@@ -1,0 +1,45 @@
+------------------------------------------------------------------
+THE INLFOW DATA GENERATION FOR TURBULENT BOUNDARY LAYER 
+------------------------------------------------------------------
+LES OPTION (ILES=1)                  ILES   :              0
+THE NUMBER OF GRID IN X1 DIRECTION   N1     :            129
+THE NUMBER OF GRID IN X2 DIRECTION   N2     :             65
+THE NUMBER OF GRID IN X3 DIRECTION   N3(ODD):            197
+REYNOLDS NUMBER                      RE     :         670.00
+THE PHYSICAL LENGTH IN X1            ALX    :           75.0
+THE PHYSICAL LENGTH IN X2            ALY    :           30.0
+THE PHYSICAL LENGTH IN X3            ALZ    :           35.0
+THE NUMBER OF TIME STEP              NTST   :          20000
+INITIAL TURBULENCE INTENSITY         VPER   :            1.5 
+TIME STEP                            DT     :           0.15
+0PTIMAL TIME STEP            (YES=1) IDTOPT :              0
+CONTINUOUS INFLOW GENERATION (YES=1) ICONT  :              0
+MAXIMUM CFL NUMBER                   CFLMAX :            2.0
+WRITE OPTION                 (YES=1) NWRITE :              1
+READ  OPTION                 (YES=1) NREAD  :              0
+AVERAGING OPTION             (YES=1) IAVG   :              0
+INTERVAL OF PRINT TIME               NPRN   :           5000
+INSTANTANEOUS FLOW FIELD     (YES=1) INSF   :              0
+INTERVAL OF PRINT IN INSF(Non-zero)  NINS   :           4000
+------------------------------------------------------------------
+MUTIGRID PARAMETER
+------------------------------------------------------------------
+NUMBER OF MULTIGRID LEVEL            NLEV   :              5
+NUMBER OF W-SHAPE NODE               IWMG   :              3
+LOCAL LOWEST MULTIGRID LEVEL         NLW    :              2
+MAX ITER NUM FOR MG SOLV (K>NSOR)    MHCMG  :             20
+MAX ITER NUM FOR MG SOLV (K<=NSOR)   MLCMG  :            100
+MAX ITER NUM FOR SOR     (K>NSOR)    NHMAXI :              5
+MAX ITER NUM FOR SOR     (K<=NSOR)   NLMAXI :             20
+RELAXATION PARAMETER FOR SOR         OMEG   :            1.0
+RESOLVED RESIDUAL LIMIT              EPSM   :         1.E-12 
+RESIUDAL RATIO BTWN LEVEL            RATIO  :           0.85 
+K-INDEX BY USING DIRECT SOR          NSOR   :              5
+PRESSURE CONDITION (FIXED=1,FREE=0)  IKO    :              1
+INITIALIZE PRESURE VALUE (YES=1,NO=0)IPHO   :              1
+------------------------------------------------------------------
+FILENAMES
+INPUT  FILE FOR READUP               FILEINI:../01_tran/fort.41
+GRID FILE FOR X DIRECTION                   :not_read
+GRID FILE FOR Y DIRECTION                   :not_read
+------------------------------------------------------------------

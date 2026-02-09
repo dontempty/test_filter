@@ -1,0 +1,4 @@
+      PARAMETER (M1=129,M2=65,M3=197)
+      PARAMETER (mt=0)
+c      PARAMETER (mt=113)
+
